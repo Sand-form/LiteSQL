@@ -32,7 +32,6 @@ public class TransactionManagerImpl implements TransactionManager {
 
     private RandomAccessFile file;
     private FileChannel fc;
-    // 当前最大的事务 ID
     private long xidCounter;
     private Lock counterLock;
 
