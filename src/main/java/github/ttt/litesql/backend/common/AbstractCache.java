@@ -4,6 +4,7 @@ import com.sun.security.auth.module.Krb5LoginModule;
 import github.ttt.litesql.commen.Error;
 
 import java.util.HashMap;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -36,11 +37,15 @@ public abstract class AbstractCache<T> {
         lock = new ReentrantLock();
     }
 
+    /**
+     * 从缓存中获取资源
+     */
     protected T get(long key) throws Exception {
+        // 循环获取资源  todo：可以优化一下
         while (true){
             lock.lock();
             if(getting.containsKey(key)) {
-                // 请求的资源正在被其他线程获取
+                // 如果其他线程正在获取这个资源，那么当前线程将等待 1ms，然后继续循环
                 lock.unlock();
                 try {
                     Thread.sleep(1);
@@ -52,14 +57,14 @@ public abstract class AbstractCache<T> {
             }
 
             if (cache.containsKey(key)) {
-                // 资源在缓存中，直接返回
+                // 资源在缓存中，直接返回，并增加引用计数
                 T obj = cache.get(key);
                 references.put(key, references.get(key) + 1);
                 lock.unlock();
                 return obj;
             }
 
-            // 尝试获取该资源
+            // 如果资源不在缓存中，尝试获取资源，如果缓存已满，抛出异常
             if(maxResource > 0 && count == maxResource) {
                 lock.unlock();
                 throw Error.CacheFullException;
@@ -70,6 +75,7 @@ public abstract class AbstractCache<T> {
             break;
         }
 
+        // 尝试获取资源
         T obj = null;
         try {
             obj = getForCache(key);
@@ -81,6 +87,7 @@ public abstract class AbstractCache<T> {
             throw e;
         }
 
+        // 将获取到的资源添加到缓存中，并设置引用计数为 1
         lock.lock();
         getting.remove(key);
         cache.put(key, obj);
@@ -90,6 +97,55 @@ public abstract class AbstractCache<T> {
         return obj;
     }
 
+    /**
+     * 强行释放一个缓存
+     * @param key
+     */
+    protected void release(long key) {
+        lock.lock();
+        try {
+            int ref = references.get(key) - 1;
+            if(ref == 0) {
+                T obj = cache.get(key);
+                releaseForCache(obj);
+                references.remove(key);
+                cache.remove(key);
+                count --;
+            } else {
+                references.put(key, ref);
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    protected void close() {
+        lock.lock();
+        try {
+            Set<Long> keys = cache.keySet();
+            for(long key : keys) {
+                T obj = cache.get(key);
+                releaseForCache(obj);
+                references.remove(key);
+                cache.remove(key);
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * 当资源不存在时缓存的获取行为
+     * @param key
+     * @return
+     * @throws Exception
+     */
     protected abstract T getForCache(long key) throws Exception;
+
+    /**
+     * 当资源驱逐时的写回行为
+     * @param obj
+     */
+    protected abstract void releaseForCache(T obj);
 
 }
