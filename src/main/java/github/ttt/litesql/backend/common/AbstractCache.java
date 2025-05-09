@@ -5,6 +5,7 @@ import github.ttt.litesql.commen.Error;
 
 import java.util.HashMap;
 import java.util.Set;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -24,6 +25,7 @@ public abstract class AbstractCache<T> {
     // 缓存中元素的个数
     private int count = 0;
     private Lock lock;
+    private Condition resourseAvailable;
 
     /**
      * 初始化
@@ -35,6 +37,7 @@ public abstract class AbstractCache<T> {
         getting = new HashMap<>();
         this.maxResource = maxResource;
         lock = new ReentrantLock();
+        resourseAvailable = lock.newCondition();
     }
 
     /**
