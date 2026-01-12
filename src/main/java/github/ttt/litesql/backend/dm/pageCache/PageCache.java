@@ -9,7 +9,11 @@ import java.io.FileNotFoundException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 
+/**
+ * 定义页面缓存的接口，包括新建页面、获取页面、释放页面、关闭缓存、根据最大页号截断缓存、获取当前页面数量以及刷新页面方法等
+ */
 public interface PageCache {
+    // 将 PAGE_SIZE 定义为 8192 字节
     public static final int PAGE_SIZE = 1 << 13;
 
     int newPage(byte[] initData);
